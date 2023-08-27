@@ -1,27 +1,25 @@
 //SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.6.12;
-
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.18;
 
 interface IERC20 {
-    event Approval(address indexed owner, address indexed spender, uint value);
-    event Transfer(address indexed from, address indexed to, uint value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Transfer(address indexed from, address indexed to, uint256 value);
 
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function decimals() external view returns (uint8);
-    function totalSupply() external view returns (uint);
-    function balanceOf(address owner) external view returns (uint);
-    function allowance(address owner, address spender) external view returns (uint);
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address owner) external view returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
 
-    function approve(address spender, uint value) external returns (bool);
-    function transfer(address to, uint value) external returns (bool);
-    function transferFrom(address from, address to, uint value) external returns (bool);
+    function approve(address spender, uint256 value) external returns (bool);
+    function transfer(address to, uint256 value) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
 }
 
 interface IWETH is IERC20 {
     function deposit() external payable;
-    function withdraw(uint) external;
+    function withdraw(uint256) external;
 }
 
 // This contract simply calls multiple targets sequentially, ensuring WETH balance before and after
@@ -29,19 +27,19 @@ interface IWETH is IERC20 {
 contract FlashBotsMultiCall {
     address private immutable owner;
     address private immutable executor;
-    IWETH private constant WETH = IWETH(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    IWETH private constant WETH = IWETH(0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6);
 
     modifier onlyExecutor() {
-        require(msg.sender == executor);
+        require(msg.sender == executor, "Not the executor");
         _;
     }
 
     modifier onlyOwner() {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "Not the owner");
         _;
     }
 
-    constructor(address _executor) public payable {
+    constructor(address _executor) payable {
         owner = msg.sender;
         executor = _executor;
         if (msg.value > 0) {
@@ -53,12 +51,13 @@ contract FlashBotsMultiCall {
     }
 
     function uniswapWeth(uint256 _wethAmountToFirstMarket, uint256 _ethAmountToCoinbase, address[] memory _targets, bytes[] memory _payloads) external onlyExecutor payable {
-        require (_targets.length == _payloads.length);
+        require (_targets.length == _payloads.length, "Targets and payloads length mismatch");
         uint256 _wethBalanceBefore = WETH.balanceOf(address(this));
         WETH.transfer(_targets[0], _wethAmountToFirstMarket);
         for (uint256 i = 0; i < _targets.length; i++) {
             (bool _success, bytes memory _response) = _targets[i].call(_payloads[i]);
-            require(_success); _response;
+            require(_success, "External call failed");
+            _response;
         }
 
         uint256 _wethBalanceAfter = WETH.balanceOf(address(this));
@@ -73,9 +72,9 @@ contract FlashBotsMultiCall {
     }
 
     function call(address payable _to, uint256 _value, bytes calldata _data) external onlyOwner payable returns (bytes memory) {
-        require(_to != address(0));
+        require(_to != address(0), "Invalid target address");
         (bool _success, bytes memory _result) = _to.call{value: _value}(_data);
-        require(_success);
+        require(_success, "Call failed");
         return _result;
     }
 }
