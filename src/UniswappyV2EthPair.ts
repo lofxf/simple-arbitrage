@@ -46,11 +46,14 @@ export class UniswappyV2EthPair extends EthMarket {
   }
 
   static async getUniswappyMarkets(provider: providers.JsonRpcProvider, factoryAddress: string): Promise<Array<UniswappyV2EthPair>> {
+    console.info("start getUniswappyMarkets: " + factoryAddress)
     const uniswapQuery = new Contract(UNISWAP_LOOKUP_CONTRACT_ADDRESS, UNISWAP_QUERY_ABI, provider);
 
     const marketPairs = new Array<UniswappyV2EthPair>()
     for (let i = 0; i < BATCH_COUNT_LIMIT * UNISWAP_BATCH_SIZE; i += UNISWAP_BATCH_SIZE) {
+      // console.info("start getPairsByIndexRange")
       const pairs: Array<Array<string>> = (await uniswapQuery.functions.getPairsByIndexRange(factoryAddress, i, i + UNISWAP_BATCH_SIZE))[0];
+      // console.info("end getPairsByIndexRange")
       for (let i = 0; i < pairs.length; i++) {
         const pair = pairs[i];
         const marketAddress = pair[2];
@@ -66,8 +69,10 @@ export class UniswappyV2EthPair extends EthMarket {
         if (!blacklistTokens.includes(tokenAddress)) {
           const uniswappyV2EthPair = new UniswappyV2EthPair(marketAddress, [pair[0], pair[1]], "");
           marketPairs.push(uniswappyV2EthPair);
+          // console.info("uniswappyV2EthPair: " + uniswappyV2EthPair)
         }
       }
+      console.info("marketPairs size: " + marketPairs.length)
       if (pairs.length < UNISWAP_BATCH_SIZE) {
         break
       }
